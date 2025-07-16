@@ -1,2 +1,3 @@
 # ABAP_CLOUD_DEVELOPMENT
 https://github.com/SAP-samples/abap-cheat-sheets/blob/main/19_ABAP_for_Cloud_Development.md
+https://help.sap.com/docs/abap-cloud/abap-cloud/why-abap-cloud
