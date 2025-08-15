@@ -1,0 +1,8 @@
+REPORT zitetr_fat2eirsal_olustur.
+
+INCLUDE zitetr_fat2eirsal_olustur_top.
+INCLUDE zitetr_fat2eirsal_olustur_sel.
+INCLUDE zitetr_fat2eirsal_olustur_cls.
+INCLUDE zitetr_fat2eirsal_olustur_clsi.
+INCLUDE zitetr_fat2eirsal_olustur_alv.
+INCLUDE zitetr_fat2eirsal_olustur_for.
