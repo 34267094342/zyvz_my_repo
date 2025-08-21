@@ -1,0 +1,338 @@
+# Dynamic exel - ABAP Code Collection
+
+This file contains ABAP code from four separate source files for the Dynamic Excel functionality.
+
+---
+
+## ZFI_DOWNLOAD_MERCH_EXCEL.txt
+
+```abap
+*&---------------------------------------------------*
+*& Program          : Excel Dosya İndirme
+*& Oluşturma Tarihi : 31.08.2022
+*& ABAP             : EMDEMIRHAN
+*& DANIŞMAN         : TKARA
+*&---------------------------------------------------*
+REPORT ZFI_DOWNLOAD_MERCH_EXCEL.
+
+"Include objects
+INCLUDE: OLE2INCL.
+
+TYPES: DATA1(1500) TYPE C,
+       TY_DATA     TYPE TABLE OF DATA1.
+
+"Variable Declarations
+DATA: W_CELL1 TYPE OLE2_OBJECT,
+      W_CELL2 TYPE OLE2_OBJECT.
+
+"Ole data Declarations
+DATA: H_EXCEL   TYPE OLE2_OBJECT, "Excel object
+      H_SHEETS  TYPE OLE2_OBJECT, "List of workbooks
+      H_SHEET   TYPE OLE2_OBJECT, "Workbook
+      H_CELL    TYPE OLE2_OBJECT, "Cell
+      WORKSHEET TYPE OLE2_OBJECT, "Worksheet
+      RANGE     TYPE OLE2_OBJECT, "Range
+      BORDERS   TYPE OLE2_OBJECT, "Borders
+      H_SHEET1  TYPE OLE2_OBJECT, "First sheet
+      H_SHEET2  TYPE OLE2_OBJECT, "Second Sheet
+      H_SHEET3  TYPE OLE2_OBJECT, "Third Sheet
+      GS_FONT   TYPE OLE2_OBJECT. "Font
+
+"Variables
+DATA: GT_1              TYPE TY_DATA WITH HEADER LINE,
+      GT_2              TYPE TY_DATA WITH HEADER LINE,
+      GT_3              TYPE TY_DATA WITH HEADER LINE,
+      DELI(1)           TYPE C,
+      GV_SHEET_NAME(20) TYPE C.
+
+DATA L_RC TYPE I.
+
+FORM RUN USING P_SPRS TYPE XFELD.
+
+  "Delimeter
+  DELI = CL_ABAP_CHAR_UTILITIES=>HORIZONTAL_TAB.
+
+  IF P_SPRS IS NOT INITIAL.
+
+    SELECT * FROM DD03L
+      INTO TABLE @DATA(T_HDR_FIELDS)
+      WHERE TABNAME   EQ 'ZSD_MERC_API_HDR'
+        AND COMPTYPE  EQ 'E'
+        AND FIELDNAME NE 'MANDT'
+      ORDER BY POSITION.
+
+    IF SY-SUBRC IS INITIAL.
+      LOOP AT T_HDR_FIELDS ASSIGNING FIELD-SYMBOL(<hdr_field>).
+        GT_1 = |{ GT_1 }{ <hdr_field>-FIELDNAME }{ DELI }|.
+      ENDLOOP.
+      APPEND GT_1. CLEAR GT_1.
+    ENDIF.
+
+    SELECT * FROM DD03L
+      INTO TABLE @DATA(T_DTL_FIELDS)
+      WHERE TABNAME  EQ 'ZSD_MERC_API_DTL'
+        AND COMPTYPE EQ 'E'
+        AND FIELDNAME NE 'MANDT'
+      ORDER BY POSITION.
+
+    IF SY-SUBRC IS INITIAL.
+      LOOP AT T_DTL_FIELDS ASSIGNING FIELD-SYMBOL(<dtl_field>).
+        GT_2 = |{ GT_2 }{ <dtl_field>-FIELDNAME }{ DELI }|.
+      ENDLOOP.
+      APPEND GT_2. CLEAR GT_2.
+    ENDIF.
+
+    SELECT * FROM DD03L
+      INTO TABLE @DATA(T_BUYER_FIELDS)
+      WHERE TABNAME  EQ 'ZSD_MERC_BUYER'
+        AND COMPTYPE EQ 'E'
+        AND FIELDNAME NE 'MANDT'
+      ORDER BY POSITION.
+
+    IF SY-SUBRC IS INITIAL.
+      LOOP AT T_BUYER_FIELDS ASSIGNING FIELD-SYMBOL(<buyer_field>).
+        GT_3 = |{ GT_3 }{ <buyer_field>-FIELDNAME }{ DELI }|.
+      ENDLOOP.
+      APPEND GT_3. CLEAR GT_3.
+    ENDIF.
+
+  ELSE.
+
+    SELECT * FROM DD03L
+      INTO TABLE @DATA(T_HDR_LOG_FIELDS)
+      WHERE TABNAME   EQ 'ZSD_MERC_HDR_LOG'
+        AND COMPTYPE  EQ 'E'
+        AND FIELDNAME NE 'MANDT'
+      ORDER BY POSITION.
+
+    IF SY-SUBRC IS INITIAL.
+      LOOP AT T_HDR_LOG_FIELDS ASSIGNING FIELD-SYMBOL(<hdr_l_field>).
+        GT_1 = |{ GT_1 }{ <hdr_l_field>-FIELDNAME }{ DELI }|.
+      ENDLOOP.
+      APPEND GT_1. CLEAR GT_1.
+    ENDIF.
+
+    SELECT * FROM DD03L
+      INTO TABLE @DATA(T_DTL_LOG_FIELDS)
+      WHERE TABNAME  EQ 'ZSD_MERC_DTL_LOG'
+        AND COMPTYPE EQ 'E'
+        AND FIELDNAME NE 'MANDT'
+      ORDER BY POSITION.
+
+    IF SY-SUBRC IS INITIAL.
+      LOOP AT T_DTL_LOG_FIELDS ASSIGNING FIELD-SYMBOL(<dtl_l_field>).
+        GT_2 = |{ GT_2 }{ <dtl_l_field>-FIELDNAME }{ DELI }|.
+      ENDLOOP.
+      APPEND GT_2. CLEAR GT_2.
+    ENDIF.
+
+    SELECT * FROM DD03L
+      INTO TABLE @DATA(T_BUYER_LOG_FIELDS)
+      WHERE TABNAME  EQ 'ZSD_MERC_BYR_LOG'
+        AND COMPTYPE EQ 'E'
+        AND FIELDNAME NE 'MANDT'
+      ORDER BY POSITION.
+
+    IF SY-SUBRC IS INITIAL.
+      LOOP AT T_BUYER_LOG_FIELDS ASSIGNING FIELD-SYMBOL(<buyer_l_field>).
+        GT_3 = |{ GT_3 }{ <buyer_l_field>-FIELDNAME }{ DELI }|.
+      ENDLOOP.
+      APPEND GT_3. CLEAR GT_3.
+    ENDIF.
+
+  ENDIF.
+
+
+  "start Excel
+  IF H_EXCEL-HEADER = SPACE OR H_EXCEL-HANDLE = -1.
+    CREATE OBJECT H_EXCEL 'EXCEL.APPLICATION'.
+  ENDIF.
+
+  "get list of workbooks, initially empty
+  CALL METHOD OF H_EXCEL 'Workbooks' = H_SHEETS.
+  SET PROPERTY OF H_EXCEL 'Visible'  = 1.
+  CALL METHOD OF H_SHEETS 'Add' = H_SHEET.
+
+  IF P_SPRS IS NOT INITIAL.
+
+    PERFORM CREATE_SHEET TABLES GT_1
+                         USING 'ZSD_MERC_API_HDR' H_SHEET1.
+
+    PERFORM CREATE_SHEET TABLES GT_2
+                         USING 'ZSD_MERC_API_DTL' H_SHEET2.
+
+    PERFORM CREATE_SHEET TABLES GT_3
+                         USING 'ZSD_MERC_BUYER' H_SHEET3.
+
+  ELSE.
+
+    PERFORM CREATE_SHEET TABLES GT_1
+                         USING 'ZSD_MERC_HDR_LOG' H_SHEET1.
+
+    PERFORM CREATE_SHEET TABLES GT_2
+                         USING 'ZSD_MERC_DTL_LOG' H_SHEET2.
+
+    PERFORM CREATE_SHEET TABLES GT_3
+                         USING 'ZSD_MERC_BYR_LOG' H_SHEET3.
+  ENDIF.
+
+  "Free Excel objects
+  FREE OBJECT: H_CELL,
+               H_SHEETS,
+               H_SHEET,
+               H_EXCEL.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*&      Form  CREATE_SHEET
+*&---------------------------------------------------------------------*
+FORM CREATE_SHEET  TABLES   IT_SHEET TYPE TY_DATA
+                   USING    IV_NAME
+                            IV_SHEET TYPE OLE2_OBJECT.
+
+  DATA L_RC TYPE I.
+
+  GV_SHEET_NAME = IV_NAME.
+
+  IF GV_SHEET_NAME NE 'ZSD_MERC_API_HDR'
+  OR GV_SHEET_NAME NE 'ZSD_MERC_HDR_LOG'.
+
+    GET PROPERTY OF H_EXCEL 'Sheets'      = IV_SHEET.
+    CALL METHOD OF IV_SHEET 'Add' = H_SHEET.
+    SET PROPERTY OF H_SHEET 'Name'        = GV_SHEET_NAME .
+    GET PROPERTY OF H_EXCEL 'ACTIVESHEET' = WORKSHEET.
+  ELSE.
+
+    GET PROPERTY OF H_EXCEL 'ACTIVESHEET' = WORKSHEET.
+    SET PROPERTY OF WORKSHEET 'Name'      = GV_SHEET_NAME .
+  ENDIF.
+
+  "Copy data in clipboard
+  CALL METHOD CL_GUI_FRONTEND_SERVICES=>CLIPBOARD_EXPORT
+    IMPORTING
+      DATA                 = IT_SHEET[]
+    CHANGING
+      RC                   = L_RC
+    EXCEPTIONS
+      CNTL_ERROR           = 1
+      ERROR_NO_GUI         = 2
+      NOT_SUPPORTED_BY_GUI = 3
+      OTHERS               = 4.
+
+  "choose first cell.
+  CALL METHOD OF H_EXCEL 'Cells' = W_CELL1
+    EXPORTING
+    #1 = 1 "Row
+    #2 = 1. "Column
+
+  "choose second cell.
+  CALL METHOD OF H_EXCEL 'Cells' = W_CELL2
+    EXPORTING
+    #1 = 1 "Row
+    #2 = 1. "Column
+
+  "Change width of column.
+  SET PROPERTY OF W_CELL1 'Columnwidth' = 12.
+
+  "Make range from selected cell
+  CALL METHOD OF H_EXCEL 'Range' = RANGE
+    EXPORTING
+    #1 = W_CELL1
+    #2 = W_CELL2.
+
+  CALL METHOD OF RANGE 'Select'.
+  "Paste data from clipboard to worksheet.
+  CALL METHOD OF WORKSHEET 'Paste'.
+
+  "Logic to assign borders to fetched data in worksheet.
+  DATA(I) = 0.
+  LOOP AT IT_SHEET INTO DATA(LS_SHEET).
+    I = I + 1.
+    DATA(FIRST) = |A{ I }|. "Column from where you want to start providing borders.
+    DATA(SECOND) = |D{ I }|. "Column up to which you want to provide the borders.
+
+    "Make range of selected columns.
+    CALL METHOD OF H_EXCEL 'Range' = RANGE
+      EXPORTING
+      #1 = FIRST
+      #2 = SECOND.
+
+    "Logic to assign border on left side.
+    CALL METHOD OF RANGE 'Borders' = BORDERS    NO FLUSH
+     EXPORTING #1  = 7. "7 for left side
+    SET PROPERTY OF BORDERS 'LineStyle'= 1. "type of line.
+
+    "Logic to assign border on right side.
+    CALL METHOD OF RANGE 'Borders' = BORDERS    NO FLUSH
+       EXPORTING #1  = 8.
+    SET PROPERTY OF BORDERS 'LineStyle'= 1.
+
+    "Logic to assign border on top side.
+    CALL METHOD OF RANGE 'Borders' = BORDERS    NO FLUSH
+       EXPORTING #1  = 9.
+    SET PROPERTY OF BORDERS 'LineStyle'= 1.
+
+    "Logic to assign border on bottom side.
+    CALL METHOD OF RANGE 'Borders' = BORDERS    NO FLUSH
+       EXPORTING #1  = 10.
+    SET PROPERTY OF BORDERS 'LineStyle'= 1.
+
+    "Logic to assign border on vertical side.
+    CALL METHOD OF RANGE 'Borders' = BORDERS    NO FLUSH
+       EXPORTING #1  = 11.
+    SET PROPERTY OF BORDERS 'LineStyle'= 1.
+
+    "Logic to assign border on horizontal side.
+    CALL METHOD OF RANGE 'Borders' = BORDERS    NO FLUSH
+       EXPORTING #1  = 12.
+    SET PROPERTY OF BORDERS 'LineStyle'= 1.
+
+  ENDLOOP.
+
+ENDFORM.                    " CREATE_SHEET
+```
+
+---
+
+## ZFI_I_TEST_OLSTRM_MERCH_CLS.txt
+
+```abap
+CLASS LCL_MAIN DEFINITION.
+...
+ENDCLASS.
+
+CLASS LCL_MAIN IMPLEMENTATION.
+...
+ENDCLASS.
+```
+
+---
+
+## ZFI_I_TEST_OLSTRM_MERCH_F01.txt
+
+```abap
+FORM SET_GRID_VAR.
+...
+ENDFORM.
+
+...
+
+ENDFORM.
+```
+
+---
+
+## ZFI_I_TEST_OLSTRM_MERCH_TOP.txt
+
+```abap
+INCLUDE: OLE2INCL.
+...
+INITIALIZATION.
+
+  CREATE OBJECT BIZOBJ.
+```
+
+---
+
+*Note: This file contains ABAP code sections from the original .txt files, preserving all original formatting and content for clarity and future reference.*
