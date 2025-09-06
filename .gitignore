@@ -1,0 +1,20 @@
+# ABAP Development artifacts
+*.tmp
+*.log
+*.bak
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+/build/
+/dist/
+
+# Documentation build
+/_site/
+.jekyll-cache/
